@@ -3,26 +3,27 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "@testing-library/dom": "^10.4.0",
-    "@testing-library/jest-dom": "^6.6.3",
-    "@testing-library/react": "^16.2.0",
-    "@testing-library/user-event": "^13.5.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "react-scripts": "5.0.1",
-    "web-vitals": "^2.1.4"
+    "@abstract-foundation/agw-client": "^x.x.x",
+    "ethers": "^6.x.x",
+    "matter-js": "^x.x.x",
+    "react": "^18.x.x",
+    "react-dom": "^18.x.x",
+    "react-scripts": "5.1.0",
+    "viem": "^x.x.x",
+    "web-vitals": "^4.2.4",
+    "zksync-ethers": "^6.x.x"
+  },
+  "devDependencies": {
+    "buffer": "^6.x.x",
+    "crypto-browserify": "^3.x.x",
+    "react-app-rewired": "^2.x.x",
+    "stream-browserify": "^3.x.x"
   },
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
+    "start": "react-app-rewired start",
+    "build": "react-app-rewired build",
+    "test": "react-app-rewired test",
     "eject": "react-scripts eject"
-  },
-  "eslintConfig": {
-    "extends": [
-      "react-app",
-      "react-app/jest"
-    ]
   },
   "browserslist": {
     "production": [
