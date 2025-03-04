@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { gsap } from 'gsap';
 import styled from 'styled-components';
 
-const PlinkoBoard = ({ wager, sessionKey, onResult, dropBall, muteEffects, onDrop }) => {
+const PlinkoBoard = ({ wager, sessionKey, signer, isEOA, onResult, dropBall, muteEffects, onDrop }) => {
   const mountRef = useRef(null);
   const slotsRef = useRef([]);
   const [ball, setBall] = useState(null);
@@ -14,7 +14,7 @@ const PlinkoBoard = ({ wager, sessionKey, onResult, dropBall, muteEffects, onDro
 
   useEffect(() => {
     if (!mountRef.current) return;
-    console.log('PlinkoBoard mounted, sessionKey:', sessionKey);
+    console.log('PlinkoBoard mounted, sessionKey:', sessionKey, 'signer:', signer, 'isEOA:', isEOA);
 
     const width = window.innerWidth * 0.9;
     const height = window.innerHeight * 0.85;
@@ -82,22 +82,23 @@ const PlinkoBoard = ({ wager, sessionKey, onResult, dropBall, muteEffects, onDro
         mountRef.current.removeChild(renderer.current.domElement);
       }
     };
-  }, [muteEffects, sessionKey]);
+  }, [muteEffects]);
 
   const handleDrop = async () => {
-    if (!sessionKey || ball) {
-      console.log('Drop blocked:', { sessionKey, ball });
+    if ((isEOA && !signer) || (!isEOA && !sessionKey) || ball) {
+      console.log('Drop blocked:', { signer, sessionKey, isEOA, ball });
       return;
     }
 
     console.log('Starting drop—waiting for tx');
-    setBall({ type: 'rocket' });
 
     try {
       const txResult = await dropBall(wager);
       console.log('Drop tx completed:', txResult);
       if (txResult) {
+        setBall({ type: 'rocket' });
         setResult(txResult);
+        onResult(txResult);
 
         const oldBall = scene.current.children.find(child => child.userData && child.userData.id === 'ball');
         if (oldBall) {
@@ -152,6 +153,8 @@ const PlinkoBoard = ({ wager, sessionKey, onResult, dropBall, muteEffects, onDro
         });
 
         console.log('New ball added and animated');
+      } else {
+        setBall(null);
       }
     } catch (error) {
       console.error('Drop tx failed:', error);
@@ -159,10 +162,11 @@ const PlinkoBoard = ({ wager, sessionKey, onResult, dropBall, muteEffects, onDro
     }
   };
 
-  // Expose handleDrop via prop
   useEffect(() => {
-    if (onDrop) onDrop(handleDrop);
-  }, [wager, sessionKey, dropBall, muteEffects, onDrop]);
+    if (onDrop && typeof onDrop === 'function') {
+      onDrop(handleDrop);
+    }
+  }, [onDrop]);
 
   return (
     <BoardContainer>
@@ -180,7 +184,7 @@ const BoardContainer = styled.div`
   height: 85vh;
   border-radius: 15px;
   overflow: hidden;
-  box-shadow: 0 0 30px rgba(50, 205, 50, 0.5); /* Lime green */
+  box-shadow: 0 0 30px rgba(50, 205, 50, 0.5);
 `;
 
 const Canvas = styled.div`

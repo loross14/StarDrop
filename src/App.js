@@ -1,36 +1,24 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import styled from 'styled-components';
 import PlinkoBoard from './components/PlinkoBoard';
-import { useAbstractWallet } from './hooks/useAbstractWallet';
+import { useAGWWallet } from './hooks/useAGWWallet';
+import { useEOAWallet } from './hooks/useEOAWallet';
 
 function App() {
   const [wager, setWager] = useState(0.001);
   const [muteEffects, setMuteEffects] = useState(false);
-  const [muteTheme, setMuteTheme] = useState(false);
-  const [dropHandler, setDropHandler] = useState(null);
+  const [muteTheme, setMuteTheme] = useState(true);
+  const [dropHandler, setDropHandler] = useState(() => () => {});
+  const [walletType, setWalletType] = useState(null);
   const themeRef = useRef(null);
-  const walletHook = useAbstractWallet();
-  const { wallet, balance, tickets, connectAGW, connectEOA, sessionKey, signer, isEOA, updateBalance, dropBall } = walletHook;
 
-  useEffect(() => {
-    const audio = new Audio('/sounds/stardrop-theme.mp3');
-    audio.loop = true;
-    themeRef.current = audio;
-    console.log('Theme audio initialized');
-    return () => {
-      if (themeRef.current) {
-        themeRef.current.pause();
-        themeRef.current.currentTime = 0;
-        console.log('Theme audio cleaned up');
-      }
-    };
-  }, []);
+  const agwHook = useAGWWallet();
+  const eoaHook = useEOAWallet();
+  const walletHook = walletType === 'AGW' ? agwHook : walletType === 'EOA' ? eoaHook : null;
 
-  useEffect(() => {
-    if (wallet && !muteTheme) {
-      startTheme();
-    }
-  }, [wallet]);
+  const { wallet, balance, tickets, dropBall, updateBalance } = walletHook || {};
+  const sessionKey = walletType === 'AGW' ? agwHook.sessionKey : null;
+  const signer = walletType === 'EOA' ? eoaHook.signer : null;
 
   const handleDropResult = (result) => {
     updateBalance(result.payout, result.tickets);
@@ -40,34 +28,34 @@ function App() {
 
   const toggleTheme = () => {
     setMuteTheme((prev) => {
-      if (themeRef.current) {
-        if (!prev) {
+      if (prev) {
+        if (!themeRef.current) {
+          themeRef.current = new Audio('/sounds/stardrop-theme.mp3');
+          themeRef.current.loop = true;
+        }
+        themeRef.current.play().catch((error) => console.error('Theme play failed:', error));
+        console.log('Theme unmuted');
+      } else {
+        if (themeRef.current) {
           themeRef.current.pause();
+          themeRef.current.currentTime = 0;
           console.log('Theme muted');
-        } else {
-          themeRef.current.play().catch((error) => console.error('Theme play failed:', error));
-          console.log('Theme unmuted');
         }
       }
       return !prev;
     });
   };
 
-  const startTheme = () => {
-    if (themeRef.current && !muteTheme) {
-      console.log('Starting theme playback');
-      themeRef.current.play().catch((error) => console.error('Theme play failed:', error));
-    }
-  };
-
   const connectEOAWithTheme = async () => {
-    await connectEOA();
-    console.log('EOA connect completed, wallet:', wallet);
+    await eoaHook.connectEOA();
+    console.log('EOA connect completed, wallet:', eoaHook.wallet);
+    setWalletType('EOA');
   };
 
   const connectAGWWithTheme = async () => {
-    await connectAGW();
-    console.log('AGW connect completed, wallet:', wallet);
+    await agwHook.connectAGW();
+    console.log('AGW connect completed, wallet:', agwHook.wallet);
+    setWalletType('AGW');
   };
 
   const incrementWager = (amount) => setWager(prev => Math.min(prev + amount, balance));
@@ -76,13 +64,14 @@ function App() {
   const memoizedPlinkoBoard = useMemo(() => (
     <PlinkoBoard
       wager={wager}
-      sessionKey={isEOA ? signer : sessionKey}
+      sessionKey={sessionKey}
+      signer={signer}
       onResult={handleDropResult}
       dropBall={dropBall}
       muteEffects={muteEffects}
-      onDrop={setDropHandler} // Pass drop handler
+      onDrop={setDropHandler}
     />
-  ), [wager, sessionKey, signer, isEOA, dropBall, muteEffects]);
+  ), [wager, sessionKey, signer, dropBall, muteEffects, dropHandler]);
 
   return (
     <AppContainer>
@@ -96,12 +85,12 @@ function App() {
           </WalletButtons>
         ) : (
           <WalletInfo>
-            <p>{wallet.address.slice(0, 6)}...{wallet.address.slice(-4)} ({isEOA ? 'EOA' : 'AGW'})</p>
+            <p>{wallet.address.slice(0, 6)}...{wallet.address.slice(-4)} ({walletType})</p>
           </WalletInfo>
         )}
       </TopSection>
-      {wallet && memoizedPlinkoBoard}
-      {wallet && (
+      {wallet && (sessionKey || signer) && memoizedPlinkoBoard}
+      {wallet && (sessionKey || signer) && (
         <BottomControls>
           <WagerSection>
             <FundsTracker>
@@ -121,7 +110,8 @@ function App() {
               <WagerButton onClick={() => incrementWager(0.001)}>+</WagerButton>
             </WagerControls>
           </WagerSection>
-          <DropButton onClick={dropHandler} disabled={!sessionKey || !dropHandler}>
+          {console.log('DropButton render, dropHandler:', dropHandler)}
+          <DropButton onClick={() => dropHandler()} disabled={!wallet || !dropBall}>
             Drop
           </DropButton>
           <AudioControls>
@@ -134,6 +124,7 @@ function App() {
   );
 };
 
+// Styled components unchanged from your last version
 const AppContainer = styled.div`
   min-height: 100vh;
   background: linear-gradient(135deg, #0a0015, #1e0533);
@@ -167,7 +158,7 @@ const TopSection = styled.div`
 
 const Title = styled.h1`
   font-size: 48px;
-  text-shadow: 0 0 15px rgba(50, 205, 50, 0.8); /* Lime green */
+  text-shadow: 0 0 15px rgba(50, 205, 50, 0.8);
   letter-spacing: 2px;
   margin: 0;
 `;
@@ -183,22 +174,22 @@ const WalletInfo = styled.div`
   position: absolute;
   right: 20px;
   font-size: 16px;
-  text-shadow: 0 0 5px rgba(50, 205, 50, 0.5); /* Lime green */
+  text-shadow: 0 0 5px rgba(50, 205, 50, 0.5);
 `;
 
 const ConnectButton = styled.button`
   padding: 10px 20px;
   background: rgba(255, 255, 255, 0.9);
-  border: 2px solid #32CD32; /* Lime green */
+  border: 2px solid #32CD32;
   border-radius: 5px;
   color: #0a0015;
   font-size: 16px;
   font-weight: bold;
   cursor: pointer;
   transition: background 0.3s, transform 0.3s, box-shadow 0.3s;
-  box-shadow: 0 0 15px rgba(50, 205, 50, 0.5); /* Lime glow */
+  box-shadow: 0 0 15px rgba(50, 205, 50, 0.5);
   &:hover {
-    background: #32CD32; /* Lime fill */
+    background: #32CD32;
     transform: scale(1.05);
     box-shadow: 0 0 25px rgba(50, 205, 50, 0.9);
   }
@@ -214,8 +205,8 @@ const BottomControls = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-top: 2px solid #32CD32; /* Lime green */
-  box-shadow: 0 -5px 20px rgba(50, 205, 50, 0.5); /* Lime green */
+  border-top: 2px solid #32CD32;
+  box-shadow: 0 -5px 20px rgba(50, 205, 50, 0.5);
   z-index: 2;
 `;
 
@@ -230,7 +221,7 @@ const FundsTracker = styled.div`
   p {
     margin: 5px 0;
     font-size: 18px;
-    text-shadow: 0 0 5px rgba(50, 205, 50, 0.5); /* Lime green */
+    text-shadow: 0 0 5px rgba(50, 205, 50, 0.5);
   }
 `;
 
@@ -243,16 +234,16 @@ const WagerControls = styled.div`
 const WagerButton = styled.button`
   padding: 10px 15px;
   background: rgba(255, 255, 255, 0.9);
-  border: 2px solid #32CD32; /* Lime green */
+  border: 2px solid #32CD32;
   border-radius: 5px;
   color: #0a0015;
   font-size: 18px;
   font-weight: bold;
   cursor: pointer;
   transition: background 0.3s, transform 0.3s, box-shadow 0.3s;
-  box-shadow: 0 0 15px rgba(50, 205, 50, 0.5); /* Lime glow */
+  box-shadow: 0 0 15px rgba(50, 205, 50, 0.5);
   &:hover {
-    background: #32CD32; /* Lime fill */
+    background: #32CD32;
     transform: scale(1.05);
     box-shadow: 0 0 25px rgba(50, 205, 50, 0.9);
   }
@@ -262,7 +253,7 @@ const WagerInput = styled.input`
   padding: 10px;
   width: 120px;
   background: rgba(255, 255, 255, 0.9);
-  border: 2px solid #32CD32; /* Lime green */
+  border: 2px solid #32CD32;
   border-radius: 5px;
   font-size: 16px;
   text-align: center;
@@ -277,7 +268,7 @@ const WagerInput = styled.input`
 const DropButton = styled.button`
   padding: 15px 40px;
   background: rgba(255, 255, 255, 0.9);
-  border: 2px solid #32CD32; /* Lime green */
+  border: 2px solid #32CD32;
   border-radius: 8px;
   color: #0a0015;
   font-size: 20px;
@@ -285,9 +276,9 @@ const DropButton = styled.button`
   font-family: 'Orbitron', sans-serif;
   cursor: pointer;
   transition: background 0.3s, transform 0.3s, box-shadow 0.3s;
-  box-shadow: 0 0 15px rgba(50, 205, 50, 0.5); /* Lime glow */
+  box-shadow: 0 0 15px rgba(50, 205, 50, 0.5);
   &:hover {
-    background: #32CD32; /* Lime fill */
+    background: #32CD32;
     transform: scale(1.1);
     box-shadow: 0 0 25px rgba(50, 205, 50, 0.9);
   }
@@ -308,16 +299,16 @@ const AudioControls = styled.div`
 const ControlButton = styled.button`
   padding: 10px 20px;
   background: rgba(255, 255, 255, 0.9);
-  border: 2px solid #32CD32; /* Lime green */
+  border: 2px solid #32CD32;
   border-radius: 5px;
   color: #0a0015;
   font-size: 14px;
   font-weight: bold;
   cursor: pointer;
   transition: background 0.3s, transform 0.3s, box-shadow 0.3s;
-  box-shadow: 0 0 15px rgba(50, 205, 50, 0.5); /* Lime glow */
+  box-shadow: 0 0 15px rgba(50, 205, 50, 0.5);
   &:hover {
-    background: #32CD32; /* Lime fill */
+    background: #32CD32;
     transform: scale(1.05);
     box-shadow: 0 0 25px rgba(50, 205, 50, 0.9);
   }
