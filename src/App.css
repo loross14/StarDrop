@@ -1,10 +1,7 @@
-.stardrop-app {
-  text-align: center;
-  font-family: Arial, sans-serif;
-}
-.plinko-board {
-  margin: 20px auto;
-}
-.result {
-  margin-top: 10px;
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
+
+body {
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
 }

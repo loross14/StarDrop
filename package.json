@@ -4,11 +4,15 @@
   "private": true,
   "dependencies": {
     "@abstract-foundation/agw-client": "^x.x.x",
+    "@types/three": "^0.174.0",
     "ethers": "^6.x.x",
+    "gsap": "^3.12.7",
     "matter-js": "^x.x.x",
     "react": "^18.x.x",
     "react-dom": "^18.x.x",
     "react-scripts": "5.1.0",
+    "styled-components": "^6.1.15",
+    "three": "^0.174.0",
     "viem": "^x.x.x",
     "web-vitals": "^4.2.4",
     "zksync-ethers": "^6.x.x"
