@@ -75,15 +75,15 @@ export function useAbstractWallet() {
       console.log('Connecting EOA wallet (MetaMask)...');
       if (!window.ethereum) throw new Error('MetaMask not installed');
       const browserProvider = new ethers.BrowserProvider(window.ethereum);
-      await browserProvider.send('eth_requestAccounts', []); // Request MetaMask connection
+      const accounts = await browserProvider.send('eth_requestAccounts', []);
       const signer = await browserProvider.getSigner();
-      const address = await signer.getAddress();
+      const address = accounts[0]; // Use first account
       setProvider(browserProvider);
       setSigner(signer);
       setWallet({ address });
       setIsEOA(true);
       console.log('EOA connected:', address);
-
+  
       const ethBalance = await browserProvider.getBalance(address);
       setBalance(parseFloat(ethers.formatEther(ethBalance)));
       const contract = new ethers.Contract(GAME_CONTRACT_ADDRESS, GAME_CONTRACT_ABI, signer);
@@ -133,7 +133,7 @@ export function useAbstractWallet() {
         const receipt = await tx.wait();
         const event = receipt.logs.find(log => log.topics[0] === ethers.id('BallDropped(address,uint256,uint256,uint256)'));
         const [_, , multiplier, payout] = ethers.AbiCoder.defaultAbiCoder().decode(['address', 'uint256', 'uint256', 'uint256'], event.data);
-        const tickets = wager + Math.floor(Number(ethers.formatEther(payout)));
+        const tickets = Math.floor(Number(ethers.formatEther(payout))); // Fix: Base on payout only
         console.log('EOA Drop result:', { multiplier: Number(multiplier), payout: ethers.formatEther(payout), tickets });
         return { multiplier: Number(multiplier), payout: ethers.formatEther(payout), tickets };
       } catch (error) {
@@ -157,7 +157,7 @@ export function useAbstractWallet() {
         const receipt = await client.waitForTransactionReceipt({ hash: txHash });
         const event = receipt.logs.find(log => log.topics[0] === ethers.id('BallDropped(address,uint256,uint256,uint256)'));
         const [_, , multiplier, payout] = ethers.AbiCoder.defaultAbiCoder().decode(['address', 'uint256', 'uint256', 'uint256'], event.data);
-        const tickets = wager + Math.floor(Number(ethers.formatEther(payout)));
+        const tickets = Math.floor(Number(ethers.formatEther(payout))); // Fix: Base on payout only
         console.log('AGW Drop result:', { multiplier: Number(multiplier), payout: ethers.formatEther(payout), tickets });
         return { multiplier: Number(multiplier), payout: ethers.formatEther(payout), tickets };
       } catch (error) {
